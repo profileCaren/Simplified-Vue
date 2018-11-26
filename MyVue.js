@@ -1,5 +1,6 @@
 class MyVue {
   constructor(options) {
+    
     let { el, data } = options;
     this._options = options;
     this.$el = document.querySelector(el);
