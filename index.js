@@ -1,13 +1,14 @@
 let myVue = new MyVue({
   el: "#app",
-  data: () => {
+  data: function() {
+    console.log(this);
     return {
       name: "Christina",
-      age: 22,
+      age: 21,
       height: 167,
       description: "A stupid girl.",
       bestFriend: {
-        name: "Somebody",
+        name: "Caren",
         age: 12
       }
     };

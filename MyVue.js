@@ -4,7 +4,7 @@ class MyVue {
     this._options = options;
     this.$el = document.querySelector(el);
 
-    this.data = data.call(data);
+    this.data = data.call(this);
     this.proxyData();
 
     this.compile();
@@ -79,6 +79,7 @@ class MyVue {
           });
         }
 
+        // 递归
         if (node.childNodes && node.childNodes.length) {
           replace(node);
         }
@@ -89,6 +90,8 @@ class MyVue {
   /**
    *
    * set data according to expression:
+   *  "bestFriend.name" = "Caren"
+   *                exp = val
    *
    * @param {String} exp
    * @param {*} val
@@ -103,6 +106,7 @@ class MyVue {
     }
     data[expArr[expArr.length - 1]] = val;
   }
+
   /**
    *
    *  return the value of expression.
