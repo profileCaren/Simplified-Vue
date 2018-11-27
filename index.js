@@ -9,7 +9,9 @@ let myVue = new MyVue({
       description: "A stupid girl.",
       bestFriend: {
         name: "Caren",
-        age: 12
+        age: 12,
+        link: "http://laijiawen.com/",
+        
       }
     };
   }

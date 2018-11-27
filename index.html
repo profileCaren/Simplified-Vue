@@ -11,8 +11,12 @@
       <h1>{{ name }}'s profile</h1>
       <p>age: {{ age }}</p>
       <p>height: {{ height }}</p>
-      <label >description: <input type="" name="" v-model="description" /></label> 
-      <p>best friend: {{ bestFriend.name }}</p>
+      <label
+        >description: <input type="text" name="desc" v-model="description"
+      /></label>
+      <p>
+        best friend: <a :href="bestFriend.link"> {{ bestFriend.name }}</a>
+      </p>
     </div>
 
     <script src="./MyVue.js"></script>

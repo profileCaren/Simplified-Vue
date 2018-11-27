@@ -18,7 +18,8 @@ class MyVue {
       },
       set(target, key, value, proxy) {
         return Reflect.set(target, key, value, proxy);
-        // todo: need to update the DOM
+        // TODO: need to update the DOM
+
       }
     });
 
@@ -57,13 +58,23 @@ class MyVue {
           let value = vm._getValueByExpressionString(exp);
           node.textContent = node.textContent.replace(reg, value);
           // TODO: add watcher
+
         } else if (node.nodeType == 1) {
           // 元素节点
           Array.from(node.attributes).forEach(attr => {
             let name = attr.name;
             let exp = attr.value;
 
-            if (name.startsWith("v-") || name.startsWith(":")) {
+            // directives
+            if (name.startsWith("v-bind") || name.startsWith(":")) {
+              // v-bind:href="link"  ==>  href="http://whatever.com"
+              let value = vm._getValueByExpressionString(exp);
+              let directiveName = name.split(":")[1];
+
+              node.setAttribute(directiveName, value);
+              node.removeAttribute(name);
+
+            } else if (name.startsWith("v-model")) {
               let value = vm._getValueByExpressionString(exp);
               node.value = value;
 
@@ -74,8 +85,8 @@ class MyVue {
                 vm._setValueByExpressionString(exp, newVal);
               });
             }
-
             // TODO: add watcher
+
           });
         }
 
