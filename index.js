@@ -16,7 +16,7 @@ let myVue = new MyVue({
   }
 });
 
-myVue.description = "如果你看到这句话，说明 数据 -> 视图绑定成功"
+// myVue.description = "如果你看到这句话，说明 数据 -> 视图绑定成功"
 
 // console.log("-------");
 // console.log(myVue.name);

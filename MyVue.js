@@ -1,3 +1,43 @@
+class Publisher {
+  constructor() {
+    // { key: [callbacks] }
+    this.subscribersMap = {};
+  }
+  addSub(key, subscriber) {
+    if (!this.subscribersMap[key]) {
+      this.subscribersMap[key] = [];
+    }
+    this.subscribersMap[key].push(subscriber);
+  }
+  notify(key) {
+    if (!this.subscribersMap[key]) return;
+    this.subscribersMap[key].forEach(sub => {
+      sub.update();
+    });
+  }
+}
+Publisher.target = null; // static
+
+class Subscriber {
+  constructor(exp, vm, fn) {
+    this.exp = exp;
+    this.vm = vm;
+    this.fn = fn;
+
+    Publisher.target = this;
+    let expArr = exp.trim().split(".");
+    let value = vm;
+    for (let e of expArr) {
+      value = value[e];
+    }
+    Publisher.target = null;
+  }
+
+  update() {
+    this.fn();
+  }
+}
+
 class MyVue {
   constructor(options) {
     let { el, data } = options;
@@ -5,34 +45,44 @@ class MyVue {
     this.$el = document.querySelector(el);
 
     this.data = data.call(this);
-    this.data = this.hijackData(this.data);
+    this.data = this.hijackObject(this.data);
     this.proxyDataToThis(); // make it possible to access this.data.name by this.name
 
     this.compileTemplate();
   }
 
   // 使用 Proxy 进行数据劫持。
-  // 注意，由于使用 proxy 进行数据劫持的时候，劫持的是对象，而不像 defineProperty 劫持了属性，
+  // 注意，由于使用 Proxy 进行数据劫持的时候劫持的是对象，而不像 defineProperty 劫持了属性，
   // 故此处的实现与 Vue 官方的有巨大不同。
-  hijackData(data) {
+  hijackObject(object) {
+    // 每个对象对应一个 publisher
+    let publisher = new Publisher();
 
-    for (let prop in data) {
-      if (Object.prototype.toString.call(data[prop]) === "[object Object]") {
-        data[prop] = this.hijackData(data[prop]);
+    // 只将对象进行递归劫持。
+    for (let prop in object) {
+      if (Object.prototype.toString.call(object[prop]) === "[object Object]") {
+        object[prop] = this.hijackObject(object[prop]);
       }
     }
 
-    let hijackedData = new Proxy(data, {
+    let hijackedObject = new Proxy(object, {
       get(target, key, proxy) {
+        // 这是最巧妙的，通过拦截get,将 subscriber 加到 publisher里面去。
+        // 虽然巧妙，但非常不好阅读和理解。
+        if (Publisher.target) {
+          publisher.addSub(key, Publisher.target);
+        }
         return Reflect.get(target, key, proxy);
       },
       set(target, key, value, proxy) {
-        // TODO: need to update the DOM
-        return Reflect.set(target, key, value, proxy);
+        let isSucceed = Reflect.set(target, key, value, proxy);
+        publisher.notify(key);
+        return isSucceed;
       }
     });
-    // 返回被劫持之后的data.
-    return hijackedData;
+
+    // 返回被劫持之后的object
+    return hijackedObject;
   }
 
   proxyDataToThis() {
@@ -63,35 +113,48 @@ class MyVue {
       Array.from(fragment.childNodes).forEach(node => {
         let reg = /\{\{(.*)\}\}/g;
 
-        if (node.nodeType == 3 && reg.test(node.textContent)) {
-          // 文字节点，并且文字内容包含双大括号 ;
+        if (node.nodeType == Node.TEXT_NODE && reg.test(node.textContent)) {
           let exp = RegExp.$1;
           let value = vm._getValueByExpressionString(exp);
+          let originTextContent = node.textContent;  // backup it. 
           node.textContent = node.textContent.replace(reg, value);
-          // TODO: add watcher
-        } else if (node.nodeType == 1) {
-          // 元素节点
+
+          // subscribe the data change.
+          new Subscriber(exp, vm, () => {
+            let value = vm._getValueByExpressionString(exp);
+            node.textContent = originTextContent.replace(reg, value);
+          });
+        } else if (node.nodeType == Node.ELEMENT_NODE) {
           Array.from(node.attributes).forEach(attr => {
-            let name = attr.name;
+            let attrName = attr.name;
             let exp = attr.value;
 
             // directives
-            if (name.startsWith("v-bind:") || name.startsWith(":")) {
-              // v-bind:href="link"  ==>  href="http://whatever.com"
-              let value = vm._getValueByExpressionString(exp);
-              let directiveName = name.split(":")[1];
+            if (attrName.startsWith("v-bind:") || attrName.startsWith(":")) {
+              // v-bind
+              let attrValue = vm._getValueByExpressionString(exp);
+              let directiveName = attrName.split(":")[1];
 
-              node.setAttribute(directiveName, value);
-              node.removeAttribute(name);
+              node.setAttribute(directiveName, attrValue);
+              node.removeAttribute(attrName);
 
+              // subscribe the data changes.
+              new Subscriber(exp, vm, () => {
+                attrValue = vm._getValueByExpressionString(exp);
+                node.setAttribute(directiveName, attrValue);
+              });
+            } else if (attrName.startsWith("v-model")) {
               // v-model
-            } else if (name.startsWith("v-model")) {
               let value = vm._getValueByExpressionString(exp);
               node.value = value;
 
-              // TODO: add watcher
+              // subscribe the data changes.
+              new Subscriber(exp, vm, () => {
+                let value = vm._getValueByExpressionString(exp);
+                node.value = value;
+              });
 
-              // 视图 --> 数据 的绑定
+              // listen the view changes.
               node.addEventListener("input", e => {
                 let newVal = e.target.value;
                 vm._setValueByExpressionString(exp, newVal);
@@ -100,7 +163,7 @@ class MyVue {
           });
         }
 
-        // 递归
+        // 递归编译
         if (node.childNodes && node.childNodes.length) {
           replace(node);
         }
