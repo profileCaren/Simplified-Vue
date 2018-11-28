@@ -1,4 +1,4 @@
-let myVue = new MyVue({
+let app = new MyVue({
   el: "#app",
   data: function() {
     console.log(this);
@@ -6,23 +6,29 @@ let myVue = new MyVue({
       name: "Christina",
       age: 21,
       height: 167,
-      description: "A stupid girl.",
+      description: "An insteresting girl",
       bestFriend: {
         name: "Caren",
         age: 12,
         link: "http://laijiawen.com/",
       }
     };
+  },
+  computed: {
+    // 十年后的年龄 （= =）
+    ageAfter10Years(){
+      return this.age + 10;
+    },
+
+    // 二十年后的年龄 (= =)
+    ageAfter20Years:{
+      get(){
+        return this.age + 20;
+      },
+      set(val){
+        // 二十年后的年龄变了，说明现在的年龄也变了
+        this.age = val - 20;
+      }
+    }
   }
 });
-
-// myVue.description = "如果你看到这句话，说明 数据 -> 视图绑定成功"
-
-// console.log("-------");
-// console.log(myVue.name);
-// console.log("-------");
-// myVue.name = "Christina Tan";
-// console.log("-------");
-// console.log(myVue.name);
-// console.log("-------");
-// console.log(myVue.data.name);

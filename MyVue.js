@@ -40,7 +40,7 @@ class Subscriber {
 
 class MyVue {
   constructor(options) {
-    let { el, data } = options;
+    let { el, data, computed } = options;
     this._options = options;
     this.$el = document.querySelector(el);
 
@@ -48,6 +48,7 @@ class MyVue {
     this.data = this.hijackObject(this.data);
     this.proxyDataToThis(); // make it possible to access this.data.name by this.name
 
+    this.addComputedData(computed);
     this.compileTemplate();
   }
 
@@ -95,6 +96,35 @@ class MyVue {
           this.data[key] = val;
         }
       });
+    }
+  }
+
+  addComputedData(computed){
+    for(let key in computed){
+      if(Array.prototype.toString.call(computed[key]) === "[object Function]"){
+        // function 
+        Object.defineProperty(this, key, {
+          get(){
+            let cachedValue = computed[key].call(this);
+            return cachedValue;
+          },
+          set(val){
+            throw new Error('set 你个大头鬼你 set computed');
+          }
+        });
+
+      }else if(Array.prototype.toString.call(computed[key]) === "[object Object]") { 
+        // object with get() & set()
+        Object.defineProperty(this, key, {
+          get(){
+            let cachedValue = computed[key].get.call(this);
+            return cachedValue;
+          },
+          set(val){
+            computed[key].set.call(this, val);
+          }
+        })
+      }
     }
   }
 

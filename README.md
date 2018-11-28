@@ -2,26 +2,35 @@
 
 Simplified-Vue try to implement a very simplified vue, with basic two-way binding.
 
+## Features
+
+- directives:
+  - `v-model`
+  - `v-bind:` and it's shorthand `:`
+
+- template:  `{{ whatever }}` 
+- computed
+
 ## How to run 
 
 Open `index.html`.
 
-## how to test
+## How to test if it work
 
-Try typing below in the console and observe the changes in view:
+Try typing codes below in the console and observe the changes in DOM:
 
 ```js
-myVue.age = 10;
+app.age = 10;
 
-myVue.description = "A cute girl";
+app.description = "A cute girl";
 
-myVue.bestFriend.link = "https://www.baidu.com"
+app.bestFriend.link = "https://www.baidu.com"
 
 ```
 
-Try changing the value of `<input>` and log the `myVue.description`
+Try changing the value of `<input>` and log the `app.description`
 ```js
-console.log(myVue.description);
+console.log(app.description);
 ```
 
 
@@ -30,5 +39,5 @@ console.log(myVue.description);
 - [x] 使用 Proxy 进行数据劫持
 - [x] 编译模板
 - [x] 发布-订阅模式实现数据到视图的绑定
-- [ ] computed
+- [x] computed
 - [ ] watch
