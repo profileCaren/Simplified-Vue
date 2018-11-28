@@ -1,7 +1,6 @@
 let app = new MyVue({
   el: "#app",
   data: function() {
-    console.log(this);
     return {
       name: "Christina",
       age: 21,

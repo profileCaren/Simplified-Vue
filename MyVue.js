@@ -38,18 +38,122 @@ class Subscriber {
   }
 }
 
+class TemplateCompliler {
+  compile(vm) {
+    this.vm = vm;
+    let fragment = document.createDocumentFragment();
+    let child;
+    while ((child = vm.$el.firstChild)) {
+      fragment.appendChild(child);
+    }
+
+    this.replace(fragment);
+    vm.$el.appendChild(fragment);
+  }
+
+  /**
+   *  递归替换整个DOM，逐个处理所有 Node，如果这个 Node 的类型为——
+   * 1. 字符节点，则直接找到 {{}} 匹配的字符串，将其中的表达式替换成对应data中对应的值。
+   * 2. 元素节点，则主要处理其属性，比如 "v-bind" 和 "v-model" 等， 将属性值修改为 data中对应的值。
+   *
+   * @param {*} fragment
+   * @memberof TemplateCompliler
+   */
+  replace(fragment) {
+    Array.from(fragment.childNodes).forEach(node => {
+      let reg = /\{\{(.*)\}\}/g;
+      if (node.nodeType == Node.TEXT_NODE && reg.test(node.textContent)) {
+        let exp = RegExp.$1;
+        this.replaceTextNode(exp, node);
+      } else if (node.nodeType == Node.ELEMENT_NODE) {
+        this.replaceElementNode(node);
+      }
+
+      // 递归编译
+      if (node.childNodes && node.childNodes.length) {
+        this.replace(node);
+      }
+    });
+  }
+
+  replaceTextNode(exp, node) {
+    let vm = this.vm;
+    let reg = /\{\{(.*)\}\}/g;
+    let value = vm._getValueByExpressionString(exp);
+    let originTextContent = node.textContent; // backup it.
+    node.textContent = node.textContent.replace(reg, value);
+
+    // subscribe the data change.
+    new Subscriber(exp, vm, () => {
+      let value = vm._getValueByExpressionString(exp);
+      node.textContent = originTextContent.replace(reg, value);
+    });
+  }
+
+  replaceElementNode(node) {
+    Array.from(node.attributes).forEach(attr => {
+      let attrName = attr.name;
+      let exp = attr.value;
+
+      // directives
+      if (attrName.startsWith("v-bind:") || attrName.startsWith(":")) {
+        this.replaceDirectiveVBind(exp, node, attrName);
+      } else if (attrName.startsWith("v-model")) {
+        this.replaceDirectiveVModel(exp, node);
+      }
+    });
+  }
+
+  replaceDirectiveVBind(exp, node, attrName) {
+    let vm = this.vm;
+    let attrValue = vm._getValueByExpressionString(exp);
+    let directiveName = attrName.split(":")[1];
+
+    node.setAttribute(directiveName, attrValue);
+    node.removeAttribute(attrName);
+
+    // subscribe the data changes.
+    new Subscriber(exp, vm, () => {
+      attrValue = vm._getValueByExpressionString(exp);
+      node.setAttribute(directiveName, attrValue);
+    });
+  }
+
+  replaceDirectiveVModel(exp, node) {
+    let vm = this.vm;
+    let value = vm._getValueByExpressionString(exp);
+    node.value = value;
+
+    // subscribe the data changes.
+    new Subscriber(exp, vm, () => {
+      let value = vm._getValueByExpressionString(exp);
+      node.value = value;
+    });
+
+    // listen the view changes.
+    node.addEventListener("input", e => {
+      let newVal = e.target.value;
+      vm._setValueByExpressionString(exp, newVal);
+    });
+  }
+}
+
 class MyVue {
   constructor(options) {
     let { el, data, computed } = options;
     this._options = options;
     this.$el = document.querySelector(el);
 
+    // 数据劫持、数据代理到this.
     this.data = data.call(this);
     this.data = this.hijackObject(this.data);
     this.proxyDataToThis(); // make it possible to access this.data.name by this.name
 
+    // 处理 computed
     this.addComputedData(computed);
-    this.compileTemplate();
+
+    // 编译模板
+    (new TemplateCompliler()).compile(this);
   }
 
   // 使用 Proxy 进行数据劫持。
@@ -99,105 +203,31 @@ class MyVue {
     }
   }
 
-  addComputedData(computed){
-    for(let key in computed){
-      if(Array.prototype.toString.call(computed[key]) === "[object Function]"){
-        // function 
+  addComputedData(computed) {
+    for (let key in computed) {
+      if (Array.prototype.toString.call(computed[key]) === "[object Function]") {
+        // function
         Object.defineProperty(this, key, {
-          get(){
+          get() {
             let cachedValue = computed[key].call(this);
             return cachedValue;
           },
-          set(val){
-            throw new Error('set 你个大头鬼你 set computed');
+          set(val) {
+            throw new Error("set 你个大头鬼你 set computed");
           }
         });
-
-      }else if(Array.prototype.toString.call(computed[key]) === "[object Object]") { 
+      } else if (Array.prototype.toString.call(computed[key]) === "[object Object]") {
         // object with get() & set()
         Object.defineProperty(this, key, {
-          get(){
+          get() {
             let cachedValue = computed[key].get.call(this);
             return cachedValue;
           },
-          set(val){
+          set(val) {
             computed[key].set.call(this, val);
           }
-        })
+        });
       }
-    }
-  }
-
-  compileTemplate() {
-    let fragment = document.createDocumentFragment();
-    let child;
-    let vm = this;
-    while ((child = vm.$el.firstChild)) {
-      fragment.appendChild(child);
-    }
-
-    replace(fragment);
-    vm.$el.appendChild(fragment);
-
-    function replace(fragment) {
-      Array.from(fragment.childNodes).forEach(node => {
-        let reg = /\{\{(.*)\}\}/g;
-
-        if (node.nodeType == Node.TEXT_NODE && reg.test(node.textContent)) {
-          let exp = RegExp.$1;
-          let value = vm._getValueByExpressionString(exp);
-          let originTextContent = node.textContent;  // backup it. 
-          node.textContent = node.textContent.replace(reg, value);
-
-          // subscribe the data change.
-          new Subscriber(exp, vm, () => {
-            let value = vm._getValueByExpressionString(exp);
-            node.textContent = originTextContent.replace(reg, value);
-          });
-        } else if (node.nodeType == Node.ELEMENT_NODE) {
-          Array.from(node.attributes).forEach(attr => {
-            let attrName = attr.name;
-            let exp = attr.value;
-
-            // directives
-            if (attrName.startsWith("v-bind:") || attrName.startsWith(":")) {
-              // v-bind
-              let attrValue = vm._getValueByExpressionString(exp);
-              let directiveName = attrName.split(":")[1];
-
-              node.setAttribute(directiveName, attrValue);
-              node.removeAttribute(attrName);
-
-              // subscribe the data changes.
-              new Subscriber(exp, vm, () => {
-                attrValue = vm._getValueByExpressionString(exp);
-                node.setAttribute(directiveName, attrValue);
-              });
-            } else if (attrName.startsWith("v-model")) {
-              // v-model
-              let value = vm._getValueByExpressionString(exp);
-              node.value = value;
-
-              // subscribe the data changes.
-              new Subscriber(exp, vm, () => {
-                let value = vm._getValueByExpressionString(exp);
-                node.value = value;
-              });
-
-              // listen the view changes.
-              node.addEventListener("input", e => {
-                let newVal = e.target.value;
-                vm._setValueByExpressionString(exp, newVal);
-              });
-            }
-          });
-        }
-
-        // 递归编译
-        if (node.childNodes && node.childNodes.length) {
-          replace(node);
-        }
-      });
     }
   }
 
