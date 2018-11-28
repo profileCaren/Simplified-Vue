@@ -5,27 +5,38 @@ class MyVue {
     this.$el = document.querySelector(el);
 
     this.data = data.call(this);
-    this.proxyData();
+    this.data = this.hijackData(this.data);
+    this.proxyDataToThis(); // make it possible to access this.data.name by this.name
 
-    this.compile();
+    this.compileTemplate();
   }
 
-  proxyData() {
-    // 使用 Proxy 进行数据劫持。
-    this.data = new Proxy(this.data, {
+  // 使用 Proxy 进行数据劫持。
+  // 注意，由于使用 proxy 进行数据劫持的时候，劫持的是对象，而不像 defineProperty 劫持了属性，
+  // 故此处的实现与 Vue 官方的有巨大不同。
+  hijackData(data) {
+
+    for (let prop in data) {
+      if (Object.prototype.toString.call(data[prop]) === "[object Object]") {
+        data[prop] = this.hijackData(data[prop]);
+      }
+    }
+
+    let hijackedData = new Proxy(data, {
       get(target, key, proxy) {
         return Reflect.get(target, key, proxy);
       },
       set(target, key, value, proxy) {
-        return Reflect.set(target, key, value, proxy);
         // TODO: need to update the DOM
-
+        return Reflect.set(target, key, value, proxy);
       }
     });
+    // 返回被劫持之后的data.
+    return hijackedData;
+  }
 
-    // 数据代理到 this.
-    let keys = Object.keys(this.data);
-    for (let key of keys) {
+  proxyDataToThis() {
+    for (let key in this.data) {
       Object.defineProperty(this, key, {
         get() {
           return this.data[key];
@@ -37,7 +48,7 @@ class MyVue {
     }
   }
 
-  compile() {
+  compileTemplate() {
     let fragment = document.createDocumentFragment();
     let child;
     let vm = this;
@@ -58,7 +69,6 @@ class MyVue {
           let value = vm._getValueByExpressionString(exp);
           node.textContent = node.textContent.replace(reg, value);
           // TODO: add watcher
-
         } else if (node.nodeType == 1) {
           // 元素节点
           Array.from(node.attributes).forEach(attr => {
@@ -66,7 +76,7 @@ class MyVue {
             let exp = attr.value;
 
             // directives
-            if (name.startsWith("v-bind") || name.startsWith(":")) {
+            if (name.startsWith("v-bind:") || name.startsWith(":")) {
               // v-bind:href="link"  ==>  href="http://whatever.com"
               let value = vm._getValueByExpressionString(exp);
               let directiveName = name.split(":")[1];
@@ -74,19 +84,19 @@ class MyVue {
               node.setAttribute(directiveName, value);
               node.removeAttribute(name);
 
+              // v-model
             } else if (name.startsWith("v-model")) {
               let value = vm._getValueByExpressionString(exp);
               node.value = value;
 
-              // 双向绑定，页面 ==> 数据
+              // TODO: add watcher
+
+              // 视图 --> 数据 的绑定
               node.addEventListener("input", e => {
                 let newVal = e.target.value;
-                console.log(exp, newVal);
                 vm._setValueByExpressionString(exp, newVal);
               });
             }
-            // TODO: add watcher
-
           });
         }
 
@@ -101,8 +111,9 @@ class MyVue {
   /**
    *
    * set data according to expression:
-   *  "bestFriend.name" = "Caren"
-   *                exp = val
+   *                   exp = val       ==>
+   *     "bestFriend.name" = "Caren"   ==>
+   *  this.bestFriend.name = "Caren"
    *
    * @param {String} exp
    * @param {*} val

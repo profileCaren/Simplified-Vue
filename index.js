@@ -11,11 +11,12 @@ let myVue = new MyVue({
         name: "Caren",
         age: 12,
         link: "http://laijiawen.com/",
-        
       }
     };
   }
 });
+
+myVue.description = "如果你看到这句话，说明 数据 -> 视图绑定成功"
 
 // console.log("-------");
 // console.log(myVue.name);
