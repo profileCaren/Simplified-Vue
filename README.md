@@ -40,4 +40,4 @@ console.log(app.description);
 - [x] 编译模板
 - [x] 发布-订阅模式实现数据到视图的绑定
 - [x] computed
-- [ ] watch
+- [x] methods

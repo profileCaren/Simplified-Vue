@@ -1,6 +1,6 @@
 class MyVue {
   constructor(options) {
-    let { el, data, computed } = options;
+    let { el, data, computed, methods } = options;
     this._options = options;
     this.$el = document.querySelector(el);
 
@@ -12,8 +12,15 @@ class MyVue {
     // 处理 computed
     this.addComputedData(computed);
 
+    // 处理 methods
+    for (let methodName in methods) {
+      // 绑定作用域
+      methods[methodName] = methods[methodName].bind(this);
+    }
+    this.methods = methods;
+
     // 编译模板
-    (new TemplateCompliler()).compile(this);
+    new TemplateCompliler().compile(this);
   }
 
   // 使用 Proxy 进行数据劫持。
@@ -65,7 +72,9 @@ class MyVue {
 
   addComputedData(computed) {
     for (let key in computed) {
-      if (Array.prototype.toString.call(computed[key]) === "[object Function]") {
+      if (
+        Array.prototype.toString.call(computed[key]) === "[object Function]"
+      ) {
         // function
         Object.defineProperty(this, key, {
           get() {
@@ -76,7 +85,9 @@ class MyVue {
             throw new Error("set 你个大头鬼 set computed.");
           }
         });
-      } else if (Array.prototype.toString.call(computed[key]) === "[object Object]") {
+      } else if (
+        Array.prototype.toString.call(computed[key]) === "[object Object]"
+      ) {
         // object with get() & set()
         Object.defineProperty(this, key, {
           get() {

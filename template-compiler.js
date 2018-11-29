@@ -61,6 +61,8 @@ class TemplateCompliler {
         this.replaceDirectiveVBind(exp, node, attrName);
       } else if (attrName.startsWith("v-model")) {
         this.replaceDirectiveVModel(exp, node);
+      } else if (attrName.startsWith("@") || attrName.startsWith("v-on:")) {
+        this.replaceDirectiveVOn(exp, node, attrName);
       }
     });
   }
@@ -96,5 +98,12 @@ class TemplateCompliler {
       let newVal = e.target.value;
       vm._setValueByExpressionString(exp, newVal);
     });
+  }
+
+  // @click="whatever"
+  replaceDirectiveVOn(methodName, node, attrName) {
+    let vm = this.vm;
+    let eventName = attrName.split("@")[1];
+    node.addEventListener(eventName, vm.methods[methodName]);
   }
 }

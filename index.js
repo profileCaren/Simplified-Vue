@@ -32,6 +32,11 @@ function start() {
           this.age = val - 20;
         }
       }
+    },
+    methods:{
+      aYearPassed(){
+        this.age ++;
+      }
     }
   });
 }
